@@ -8,8 +8,11 @@ function App() {
   // 상대방의 웹캠 화면
   const remoteVideoRef = useRef();
 
-  //
+  // peer connection DOM
   const pc = useRef(new RTCPeerConnection(null));
+
+  // sdp 통신을 담기 위한 textarea DOM
+  const textRef = useRef();
 
 
   useEffect(() => {
@@ -22,6 +25,11 @@ function App() {
     navigator.mediaDevices.getUserMedia(constraints)
       .then(stream => {
         localVideoRef.current.srcObject = stream;
+
+        // webcam 을 통해 stream 이 변화할 때마다 peer connection 에 추가
+        stream.getTracks().forEach(track => {
+          _pc.addTrack(track, stream);
+        })
       }).catch(e => {
       console.log("getUserMedia Error : ", e);
     });
@@ -38,7 +46,8 @@ function App() {
 
     _pc.ontrack = (e) => {
       // we got remote stream...
-
+      // 원격 스트림을 수신하지만 사용자 미디어를 가져올 때 로컬 트랙이나 스트림을 peer connection 에 추가하지 않음
+      remoteVideoRef.current.srcObject = e.streams[0]
     }
 
     pc.current = _pc;
@@ -59,7 +68,7 @@ function App() {
 
   // answer 로 sdp 프로토콜 제안 응답하기
   const createAnswer = () => {
-    pc.current.createOffer({
+    pc.current.createAnswer({
       offerToReceiveAudio: 1,
       offerToReceiveVideo: 1
     }).then(sdp => {
@@ -68,7 +77,20 @@ function App() {
     }).catch( e => console.log("createOffer error : " + e))
   }
 
+
   const setRemoteDescription = () => {
+    // get the SDP value from the text editor
+    const sdp = JSON.parse(textRef.current.value);
+    console.log(sdp);
+
+    pc.current.setRemoteDescription(new RTCSessionDescription(sdp));
+  }
+
+  const addCandidate = () => {
+    const candidate = JSON.parse(textRef.current.value);
+    console.log("Adding Candidate : ", candidate);
+
+    pc.current.addIceCandidate(new RTCIceCandidate(candidate))
 
   }
 
@@ -95,10 +117,14 @@ function App() {
         Create Answer
       </button>
 <br/>
-      <button onClick={createOffer}>
+      <textarea ref={textRef}>
+
+      </textarea>
+<br/>
+      <button onClick={setRemoteDescription}>
         Set Remote Description
       </button>
-      <button onClick={createOffer}>
+      <button onClick={addCandidate}>
         Add Candidates
       </button>
 

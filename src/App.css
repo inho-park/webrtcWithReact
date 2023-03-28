@@ -36,3 +36,12 @@
     transform: rotate(360deg);
   }
 }
+
+
+
+/*동영상 좌우 반전*/
+ video{
+   transform: rotateY(180deg);
+   -webkit-transform:rotateY(180deg); /* Safari and Chrome */
+   -moz-transform:rotateY(180deg); /* Firefox */
+ }
