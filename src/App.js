@@ -1,5 +1,14 @@
 import { useRef, useEffect } from "react";
+import io from "socket.io-client";
 import './App.css';
+
+const socket = io(
+  // server 안에 있는 webRTCNamespace
+  '/webRTCPeers', {
+    // server 에 있는 io 변수의 path 와 일치
+    path: "/webrtc"
+  }
+)
 
 function App() {
   
@@ -16,6 +25,15 @@ function App() {
 
 
   useEffect(() => {
+
+    socket.on("connection-success", success => {
+      console.log(success);
+    });
+
+    socket.on('sdp', data => {
+      console.log(data);
+    })
+
     const constraints = {
       audio: true,
       video: true
@@ -63,6 +81,11 @@ function App() {
     }).then(sdp => {
       console.log(JSON.stringify(sdp));
       pc.current.setLocalDescription(sdp);
+
+      // send  the sdp to the server
+      socket.emit('sdp', {
+        sdp
+      })
     }).catch( e => console.log("createOffer error : " + e))
   }
 

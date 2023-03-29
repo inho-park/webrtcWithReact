@@ -12,3 +12,25 @@ app.get("/", (req, res) => res.send("hello WEbRTC"));
 const server = app.listen(port, () => {
   console.log(`WebRTC App is listening on port ${port}`);
 });
+
+io.listen(server);
+
+const webRTCNamespace = io.of("/webRTCPeers");
+
+webRTCNamespace.on("connection", socket => {
+  console.log(socket.id);
+
+  socket.emit("connection-success", {
+    status: "connection-success",
+    socketID: socket.id
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`${socket.id} has disconnected`);
+  });
+
+  socket.on("sdp", data => {
+    console.log(data);
+    socket.broadcast.emit('sdp', data)
+  });
+});
