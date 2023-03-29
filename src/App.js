@@ -23,6 +23,8 @@ function App() {
   // sdp 통신을 담기 위한 textarea DOM
   const textRef = useRef();
 
+  // ice candidate DOM
+  const candidates = useRef([]);
 
   useEffect(() => {
 
@@ -32,7 +34,13 @@ function App() {
 
     socket.on('sdp', data => {
       console.log(data);
-    })
+      textRef.current.value = JSON.stringify(data.sdp);
+    });
+
+    socket.on('candidate', candidate => {
+      console.log(candidate);
+      candidates.current = [...candidates.current, candidate];
+    });
 
     const constraints = {
       audio: true,
@@ -47,7 +55,7 @@ function App() {
         // webcam 을 통해 stream 이 변화할 때마다 peer connection 에 추가
         stream.getTracks().forEach(track => {
           _pc.addTrack(track, stream);
-        })
+        });
       }).catch(e => {
       console.log("getUserMedia Error : ", e);
     });
@@ -55,7 +63,10 @@ function App() {
     // peer connection 변수 생성
     const _pc = new RTCPeerConnection(null);
     _pc.onicecandidate = (e) => {
-      if (e.candidate) console.log(JSON.stringify(e.candidate));
+      if (e.candidate) {
+        console.log(JSON.stringify(e.candidate))
+        socket.emit('candidate', e.candidate);
+      };
     }
 
     _pc.oniceconnectionstatechange = (e) => {
@@ -82,7 +93,7 @@ function App() {
       console.log(JSON.stringify(sdp));
       pc.current.setLocalDescription(sdp);
 
-      // send  the sdp to the server
+      // send the sdp to the server
       socket.emit('sdp', {
         sdp
       })
@@ -97,6 +108,11 @@ function App() {
     }).then(sdp => {
       console.log(JSON.stringify(sdp));
       pc.current.setLocalDescription(sdp);
+
+      // send the answer sdp to the offering peer
+      socket.emit('sdp', {
+        sdp
+      });
     }).catch( e => console.log("createOffer error : " + e))
   }
 
@@ -110,10 +126,14 @@ function App() {
   }
 
   const addCandidate = () => {
-    const candidate = JSON.parse(textRef.current.value);
-    console.log("Adding Candidate : ", candidate);
+    // const candidate = JSON.parse(textRef.current.value);
+    // console.log("Adding Candidate : ", candidate);
 
-    pc.current.addIceCandidate(new RTCIceCandidate(candidate))
+    candidates.current.forEach(candidate => {
+      console.log(candidate);
+      pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
 
   }
 

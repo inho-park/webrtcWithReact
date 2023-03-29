@@ -33,4 +33,9 @@ webRTCNamespace.on("connection", socket => {
     console.log(data);
     socket.broadcast.emit('sdp', data)
   });
+
+  socket.on('candidate', data => {
+    console.log(data);
+    socket.broadcast.emit('candidate', data);
+  });
 });
