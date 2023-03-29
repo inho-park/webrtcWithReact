@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import {useRef, useEffect, useState} from "react";
 import io from "socket.io-client";
 import './App.css';
 
@@ -24,7 +24,11 @@ function App() {
   const textRef = useRef();
 
   // ice candidate DOM
-  const candidates = useRef([]);
+  // const candidates = useRef([]);
+  const [offerVisible, setOfferVisible] = useState(true);
+  const [answerVisible, setAnswerVisible] = useState(false);
+  const [status, setStatus] = useState("Make a call new");
+
 
   useEffect(() => {
 
@@ -34,12 +38,22 @@ function App() {
 
     socket.on('sdp', data => {
       console.log(data);
+      pc.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
       textRef.current.value = JSON.stringify(data.sdp);
+
+      if (data.sdp.type === 'offer' ) {
+        setOfferVisible(false);
+        setAnswerVisible(true);
+        setStatus('Incoming call...............');
+      } else {
+        setStatus('Call established');
+      }
     });
 
     socket.on('candidate', candidate => {
       console.log(candidate);
-      candidates.current = [...candidates.current, candidate];
+      // candidates.current = [...candidates.current, candidate];
+      pc.current.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
     const constraints = {
@@ -62,16 +76,17 @@ function App() {
 
     // peer connection 변수 생성
     const _pc = new RTCPeerConnection(null);
+
     _pc.onicecandidate = (e) => {
       if (e.candidate) {
         console.log(JSON.stringify(e.candidate))
-        socket.emit('candidate', e.candidate);
-      };
-    }
+        sendToPeer('candidate', e.candidate);
+      }
+    };
 
     _pc.oniceconnectionstatechange = (e) => {
-      console.log(e)
-    }
+      console.log(e);
+    };
 
     _pc.ontrack = (e) => {
       // we got remote stream...
@@ -82,6 +97,17 @@ function App() {
     pc.current = _pc;
   }, []);
 
+  const sendToPeer = (eventType, payload) => {
+    socket.emit(eventType, payload);
+  };
+
+  const processSDP = (sdp) => {
+    console.log(JSON.stringify(sdp));
+    pc.current.setLocalDescription(sdp);
+
+    sendToPeer('sdp', { sdp });
+  }
+
   // offer 로 먼저 sdp 프로토콜 제안 보내기
   // offer 보낼 시 ICE ( interact connectivity establishment ) candidate 를
   // peer connection 에 추가할 때 사용가능
@@ -90,13 +116,9 @@ function App() {
       offerToReceiveAudio: 1,
       offerToReceiveVideo: 1
     }).then(sdp => {
-      console.log(JSON.stringify(sdp));
-      pc.current.setLocalDescription(sdp);
-
-      // send the sdp to the server
-      socket.emit('sdp', {
-        sdp
-      })
+      processSDP(sdp);
+      setOfferVisible(false);
+      setStatus('Calling............');
     }).catch( e => console.log("createOffer error : " + e))
   }
 
@@ -106,35 +128,44 @@ function App() {
       offerToReceiveAudio: 1,
       offerToReceiveVideo: 1
     }).then(sdp => {
-      console.log(JSON.stringify(sdp));
-      pc.current.setLocalDescription(sdp);
-
-      // send the answer sdp to the offering peer
-      socket.emit('sdp', {
-        sdp
-      });
+      processSDP(sdp);
+      setAnswerVisible(false);
+      setStatus('Call establish');
     }).catch( e => console.log("createOffer error : " + e))
   }
 
 
-  const setRemoteDescription = () => {
-    // get the SDP value from the text editor
-    const sdp = JSON.parse(textRef.current.value);
-    console.log(sdp);
+  // const setRemoteDescription = () => {
+  //   // get the SDP value from the text editor
+  //   const sdp = JSON.parse(textRef.current.value);
+  //   console.log(sdp);
+  //
+  //   pc.current.setRemoteDescription(new RTCSessionDescription(sdp));
+  // }
 
-    pc.current.setRemoteDescription(new RTCSessionDescription(sdp));
-  }
+  // const addCandidate = () => {
+  //   // const candidate = JSON.parse(textRef.current.value);
+  //   // console.log("Adding Candidate : ", candidate);
+  //
+  //   candidates.current.forEach(candidate => {
+  //     console.log(candidate);
+  //     pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+  //   });
+  // }
 
-  const addCandidate = () => {
-    // const candidate = JSON.parse(textRef.current.value);
-    // console.log("Adding Candidate : ", candidate);
-
-    candidates.current.forEach(candidate => {
-      console.log(candidate);
-      pc.current.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-
-
+  const showHideButtons = () => {
+    if (offerVisible) {
+      return (
+        <div>
+          <button onClick={createOffer}>Call</button>
+        </div>
+      )
+    } else if (answerVisible) { return (
+        <div>
+          <button onClick={createAnswer}>Answer</button>
+        </div>
+      )
+    }
   }
 
   return (
@@ -153,24 +184,18 @@ function App() {
       }}></video>
 
       <br/>
-      <button onClick={createOffer}>
-        Create Offer
-      </button>
-      <button onClick={createAnswer}>
-        Create Answer
-      </button>
-<br/>
+      {/*<button onClick={createOffer}>*/}
+      {/*  Create Offer*/}
+      {/*</button>*/}
+      {/*<button onClick={createAnswer}>*/}
+      {/*  Create Answer*/}
+      {/*</button>*/}
+
+      { showHideButtons() }
+      <div>{ status }</div>
       <textarea ref={textRef}>
 
       </textarea>
-<br/>
-      <button onClick={setRemoteDescription}>
-        Set Remote Description
-      </button>
-      <button onClick={addCandidate}>
-        Add Candidates
-      </button>
-
 
     </div>
   );
